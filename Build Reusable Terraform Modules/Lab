@@ -1,0 +1,149 @@
+Build Reusable Terraform Modules
+Objectives
+Create a reusable Terraform child module with main.tf, variables.tf, outputs.tf
+Pass parameters into modules using input variables
+Retrieve and use module outputs in a root configuration
+Call the same module multiple times with different inputs
+Deploy and verify modular infrastructure using init, plan, apply
+Prerequisites
+Basic understanding of Terraform syntax (resources, providers, variables)
+Familiarity with Linux terminal commands
+Prior exposure to the local provider is helpful but not required
+Environment Setup
+Al Nafi provides a single Linux machine via Start Lab. Use it directly.
+
+Verify/install Terraform:
+terraform -version
+If not installed:
+
+curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform -y
+Create project structure:
+mkdir -p ~/tf-modules-lab/modules/file-creator
+cd ~/tf-modules-lab
+Tasks
+Task 1: Build the Child Module
+Navigate to the module directory:
+
+cd ~/tf-modules-lab/modules/file-creator
+Create variables.tf — define inputs for filename and content:
+
+variable "filename" {
+  description = "Path/name of the file to create"
+  type        = string
+}
+
+variable "content" {
+  description = "Content to write into the file"
+  type        = string
+  # TODO: add a sensible default value
+}
+
+variable "file_permission" {
+  description = "Permission bits for the file"
+  type        = string
+  default     = "0644"
+}
+Create main.tf — define the resource using the local provider:
+
+terraform {
+  required_providers {
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.4"
+    }
+  }
+}
+
+resource "local_file" "this" {
+  # TODO: set filename argument using var.filename
+  # TODO: set content argument using var.content
+  # TODO: set file_permission argument using var.file_permission
+}
+Create outputs.tf — expose useful attributes:
+
+output "file_path" {
+  description = "Path of the created file"
+  value       = local_file.this.filename
+}
+
+output "file_id" {
+  description = "Terraform resource ID of the file"
+  value       = local_file.this.id
+}
+
+# TODO: add an output "content_md5" that exposes local_file.this.content_md5
+Task 2: Build the Root Configuration
+Move to the project root:
+
+cd ~/tf-modules-lab
+Create root main.tf. Call the module twice with different parameters:
+
+terraform {
+  required_providers {
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.4"
+    }
+  }
+}
+
+module "readme_file" {
+  source   = "./modules/file-creator"
+  filename = "${path.module}/output/README.txt"
+  content  = "This file was created by Terraform module 1."
+}
+
+module "config_file" {
+  source          = "./modules/file-creator"
+  filename        = "${path.module}/output/app.conf"
+  content         = "env=production\nversion=1.0"
+  # TODO: pass a custom file_permission value, e.g. "0600"
+}
+Task 3: Expose Module Outputs at Root Level
+Create root outputs.tf:
+
+output "readme_path" {
+  value = module.readme_file.file_path
+}
+
+output "config_path" {
+  value = module.config_file.file_path
+}
+
+# TODO: add an output that displays module.config_file.content_md5
+Task 4: Initialize, Plan, and Apply
+Run the standard Terraform workflow:
+
+terraform init
+terraform plan
+terraform apply -auto-approve
+Expected behavior:
+
+Terraform initializes the local provider and discovers the child module
+Plan shows 2 resources to add (one per module call)
+Apply creates output/README.txt and output/app.conf
+Task 5: Troubleshooting Checklist
+Error: Module not installed — run terraform init again after any module source path change
+Permission denied writing file — ensure output/ directory is writable; Terraform creates it automatically via local_file, but check parent directory permissions
+Output shows (known after apply) for content_md5 — expected during plan; resolves after apply
+Changing module inputs has no effect — confirm you saved the file and re-run terraform plan
+Verification
+Confirm files were created:
+cat output/README.txt
+cat output/app.conf
+Check permission bits on app.conf match your custom setting:
+stat -c "%a %n" output/app.conf
+Display outputs from state:
+terraform output
+Confirm module reusability by inspecting state resources:
+terraform state list
+Expected entries:
+
+module.readme_file.local_file.this
+module.config_file.local_file.this
+Clean up when done:
+terraform destroy -auto-approve
+Conclusion
+In this lab, you built a reusable Terraform child module encapsulating a local_file resource with parameterized inputs (filename, content, file_permission) and defined outputs to expose resource details. You referenced this module twice from a root configuration, passing distinct parameters into each call, demonstrating true module reusability. You then wired module outputs into root-level outputs and validated the entire deployment using terraform init, plan, and apply. This pattern of building small, composable modules mirrors real-world DevOps and Cloud Architect workflows, and directly supports the module-related objectives of the HashiCorp Certified: Terraform Associate exam.
