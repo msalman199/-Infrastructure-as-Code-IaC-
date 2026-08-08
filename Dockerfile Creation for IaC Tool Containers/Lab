@@ -1,0 +1,158 @@
+Dockerfile Creation for IaC Tool Containers
+Objectives
+By the end of this lab, you will be able to:
+
+Install and verify Docker on a Linux machine
+Write a Dockerfile that packages Terraform CLI on a lightweight base image
+Build, tag, and run Docker containers to validate IaC tool installation
+Extend a Dockerfile to include Ansible, Python dependencies, and project files
+Execute Terraform and Ansible commands inside a running container
+Push a custom image to a local Docker registry for CI/CD reuse
+Prerequisites
+Basic Linux command-line familiarity (cd, mkdir, nano/vim)
+Basic understanding of Terraform and Ansible concepts
+Familiarity with Docker concepts (images, containers, layers) is helpful but not required
+Root or sudo access on the provided Linux machine
+Environment Setup
+Al Nafi provides a single Linux machine (Ubuntu-based) via Start Lab
+All work is done in one terminal session — no external cloud accounts needed
+Internet access is required to pull base images and packages
+Task 1: Install and Verify Docker
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker.gpg
+echo "deb [signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+Verify installation:
+
+docker --version
+sudo systemctl status docker --no-pager
+Add your user to the docker group to avoid using sudo for every command:
+sudo usermod -aG docker $USER
+newgrp docker
+Task 2: Write a Dockerfile for Terraform
+Create a project directory:
+
+mkdir -p ~/iac-container/terraform-only && cd ~/iac-container/terraform-only
+Create Dockerfile with the following starter template — complete the TODOs:
+
+# Use a lightweight base image
+FROM alpine:3.19
+
+# TODO: Set environment variable for Terraform version (e.g., 1.7.5)
+ENV TERRAFORM_VERSION=___
+
+# TODO: Install required packages: curl, unzip
+RUN apk add --no-cache ___
+
+# TODO: Download and install Terraform binary from HashiCorp releases
+# Hint: URL pattern -> https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+RUN curl -O ___ && \
+    unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin/ && \
+    rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+
+WORKDIR /workspace
+
+ENTRYPOINT ["terraform"]
+Reference the Terraform releases page for a valid current version number.
+Task 3: Build, Tag, and Run the Terraform Image
+docker build -t terraform-cli:1.0 .
+docker images | grep terraform-cli
+Run a container to verify Terraform works:
+
+docker run --rm terraform-cli:1.0 --version
+Troubleshooting:
+
+If build fails on unzip, confirm the package was added in the apk add line
+If terraform: not found, check the binary path is /usr/local/bin/terraform and it has execute permission (chmod +x may be required after unzip)
+Task 4: Extend the Dockerfile for Ansible and Python
+Create a new directory for the extended image:
+
+mkdir -p ~/iac-container/full-iac && cd ~/iac-container/full-iac
+Create Dockerfile:
+
+FROM alpine:3.19
+
+ENV TERRAFORM_VERSION=1.7.5
+
+# Install Terraform dependencies + Python + pip
+RUN apk add --no-cache curl unzip python3 py3-pip bash
+
+# Install Terraform
+RUN curl -O https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
+    unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin/ && \
+    rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+
+# TODO: Install Ansible via pip (use --break-system-packages if required by base image)
+RUN pip3 install ___
+
+WORKDIR /workspace
+
+# TODO: Add a default shell entrypoint so both tools are accessible interactively
+ENTRYPOINT ["___"]
+Confirm Ansible installs cleanly: some Alpine/pip combinations require --no-cache-dir or --break-system-packages flags — check pip's error output if the build fails.
+Task 5: Add Sample Terraform Config and Ansible Playbook
+Create sample files in the same directory:
+
+main.tf:
+
+terraform {
+  required_version = ">= 1.0"
+}
+
+resource "local_file" "sample" {
+  filename = "${path.module}/sample_output.txt"
+  content  = "Hello from Terraform inside Docker"
+}
+playbook.yml:
+
+- hosts: localhost
+  connection: local
+  tasks:
+    - name: Print a message
+      debug:
+        msg: "Hello from Ansible inside Docker"
+Update the Dockerfile to copy these files — add this line before WORKDIR:
+
+# TODO: Copy main.tf and playbook.yml into the /workspace directory
+COPY ___ /workspace/
+Task 6: Build, Run, and Execute Both Tools
+Build the extended image:
+
+docker build -t iac-toolbox:1.0 .
+Run an interactive container:
+
+docker run --rm -it --entrypoint bash iac-toolbox:1.0
+Inside the container, execute:
+
+cd /workspace
+terraform init
+terraform plan
+ansible-playbook playbook.yml
+Expected: Terraform plan shows a local_file resource creation; Ansible outputs the debug message
+Exit the container with exit
+Troubleshooting:
+
+If terraform init fails, ensure the local provider can be downloaded (requires internet access inside the container)
+If ansible-playbook: command not found, re-check the pip install step in Task 4
+Task 7: Push Image to a Local Docker Registry
+Start a local registry container:
+
+docker run -d -p 5000:5000 --restart=always --name registry registry:2
+Tag and push your image:
+
+docker tag iac-toolbox:1.0 localhost:5000/iac-toolbox:1.0
+docker push localhost:5000/iac-toolbox:1.0
+Verify the image is stored in the registry:
+
+curl http://localhost:5000/v2/_catalog
+Expected output: {"repositories":["iac-toolbox"]}
+Verification Checklist
+docker --version returns a valid Docker version
+docker run --rm terraform-cli:1.0 --version prints Terraform version
+iac-toolbox:1.0 image builds without errors
+terraform plan and ansible-playbook playbook.yml both run successfully inside the container
+Local registry catalog lists iac-toolbox
+Conclusion
+In this lab, you installed Docker on a Linux machine and built a custom container image packaging Terraform CLI using a lightweight Alpine base. You extended this image to include Ansible and Python dependencies, embedded sample IaC artifacts (a Terraform configuration and an Ansible playbook) using the COPY instruction, and validated both tools by executing them inside a running container. Finally, you deployed a local Docker registry and pushed your custom image to it, simulating a reusable artifact suitable for CI/CD pipelines. These skills — Dockerfile authoring, multi-tool image builds, and local registry management — are foundational for DevOps and Platform Engineer roles working with containerized Infrastructure as Code workflows.
