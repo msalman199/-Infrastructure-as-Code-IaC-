@@ -1,0 +1,124 @@
+Install and Configure Terraform on Linux
+Objectives
+By the end of this lab, you will be able to:
+
+Install Terraform on a Linux machine and add it to system PATH
+Verify the Terraform installation using CLI commands
+Write a basic Terraform configuration file using the local provider
+Understand and execute the core Terraform workflow: init, plan, apply, destroy
+Prerequisites
+Basic familiarity with the Linux terminal (navigating directories, running commands)
+No prior Terraform experience required
+A text editor (nano, vim, or any editor available on the machine)
+Environment Setup
+This lab uses a single Linux machine (provided via Al Nafi Start Lab)
+No cloud provider account is required — this lab uses Terraform's local provider only
+Ensure you have internet access to download the Terraform binary and provider plugin
+Tasks
+Task 1: Download and Install Terraform
+Update package lists and install required utilities:
+sudo apt-get update
+sudo apt-get install -y wget unzip
+Download the Terraform binary (check terraform.io for the latest version number if needed):
+wget https://releases.hashicorp.com/terraform/1.9.5/terraform_1.9.5_linux_amd64.zip
+Unzip the downloaded file:
+unzip terraform_1.9.5_linux_amd64.zip
+Move the binary into your system PATH so it can be run from anywhere:
+sudo mv terraform /usr/local/bin/
+Confirm the binary is executable:
+sudo chmod +x /usr/local/bin/terraform
+Note: /usr/local/bin is already part of the default PATH on most Linux distributions. Verify with echo $PATH.
+
+Task 2: Verify the Installation
+Check the installed Terraform version:
+terraform --version
+Expected output: something like Terraform v1.9.5
+
+Explore the built-in help system:
+terraform --help
+View help for a specific command:
+terraform plan --help
+Task 3: Create a Project Directory and Write main.tf
+Create a new directory for your Terraform project:
+mkdir ~/terraform-lab
+cd ~/terraform-lab
+Create a file named main.tf:
+nano main.tf
+Add the following configuration. This uses the local provider to create a text file on your machine — no cloud account needed.
+# main.tf
+# This block tells Terraform which provider to use
+terraform {
+  required_providers {
+    local = {
+      source  = "hashicorp/local"  # official local provider
+      version = "~> 2.5"           # provider version constraint
+    }
+  }
+}
+
+# This block configures the local provider (no settings needed)
+provider "local" {}
+
+# This resource creates a simple text file on disk
+resource "local_file" "my_first_file" {
+  filename = "${path.module}/hello.txt"   # file path (in the same folder)
+  content  = "Hello from Terraform! This file was created by IaC.\n"  # file content
+}
+Save and exit (in nano: Ctrl+O, Enter, then Ctrl+X)
+Task 4: Initialize the Working Directory
+Run the init command to download the local provider plugin:
+terraform init
+What this does:
+
+Reads your main.tf file
+Downloads the hashicorp/local provider plugin
+Creates a .terraform directory and a lock file (.terraform.lock.hcl)
+Expected output: Terraform has been successfully initialized!
+
+Task 5: Preview Changes with terraform plan
+Run the plan command:
+terraform plan
+What to look for in the output:
+
+A + sign next to local_file.my_first_file means Terraform will create this resource
+Review the filename and content attributes shown in the plan
+No changes are made to your system yet — this is only a preview
+Task 6: Apply the Configuration
+Run the apply command:
+terraform apply
+Terraform will show the plan again and prompt for confirmation. Type:
+yes
+Confirm the file was created:
+ls -l
+cat hello.txt
+Expected output: hello.txt exists and contains the text "Hello from Terraform!..."
+
+Inspect the state file Terraform created to track the resource:
+cat terraform.tfstate
+Task 7: Destroy the Resource
+Run the destroy command to remove the resource:
+terraform destroy
+Type yes when prompted to confirm.
+
+Verify the file was removed:
+
+ls -l
+Expected output: hello.txt should no longer be listed.
+
+Verification
+Confirm the lab is complete by checking:
+
+Step	Command	Expected Result
+Install	terraform --version	Shows installed version number
+Init	terraform init	"successfully initialized" message
+Plan	terraform plan	Shows + create for local_file resource
+Apply	terraform apply	hello.txt file exists with correct content
+Destroy	terraform destroy	hello.txt file no longer exists
+Troubleshooting Tips
+terraform: command not found — Double-check the binary was moved to /usr/local/bin and is executable (chmod +x)
+Error: Failed to query available provider packages — Check your internet connection; the local provider must be downloaded during init
+Permission denied errors — Ensure you have write permissions in your project directory (avoid running as root unless necessary)
+main.tf syntax errors — Terraform configuration is sensitive to braces {} and indentation; compare carefully with the provided template
+Old state blocking destroy — If terraform destroy fails, ensure you are in the same directory where terraform apply was run (state file must be present)
+Conclusion
+In this lab, you installed Terraform on a Linux machine and added it to your system PATH, then verified the installation using CLI commands. You created a minimal Terraform configuration using the local provider and walked through the complete core workflow: initializing the working directory with init, previewing changes with plan, provisioning a local file resource with apply, and cleaning up with destroy. These fundamentals — writing configuration files, understanding provider plugins, and following the init-plan-apply-destroy cycle — form the foundation for all Infrastructure as Code work with Terraform, regardless of which provider (AWS, Azure, GCP, or local) you use in future labs.
