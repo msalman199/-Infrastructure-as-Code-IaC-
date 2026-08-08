@@ -1,0 +1,234 @@
+Document Infrastructure with DSL and Diagrams
+Objectives
+By the end of this lab, you will be able to:
+
+Create a standard DevOps repository folder structure
+Write clear documentation (README.md) for infrastructure repositories
+Build a YAML-based infrastructure manifest describing a three-tier application
+Document compute, networking, and storage components in a structured format
+Create a basic deployment plan with rollback procedures
+Generate a simple architecture diagram using a text-based diagramming tool
+Prerequisites
+Basic familiarity with the Linux terminal (navigating folders, creating files)
+No prior YAML or diagramming experience required
+A single Linux machine (provided via Al Nafi Start Lab)
+Environment Setup
+Start your Linux lab machine from Al Nafi.
+Open a terminal.
+Install required tools:
+# Update package list
+sudo apt update
+
+# Install Python and pip (used for diagrams-as-code tool)
+sudo apt install -y python3 python3-pip
+
+# Install Graphviz (required by the Python "diagrams" library)
+sudo apt install -y graphviz
+
+# Install the diagrams Python library
+pip3 install diagrams --user
+
+# Verify installations
+python3 --version
+dot -V
+Tasks
+Task 1: Create the Repository Folder Structure
+Create a root project folder and move into it:
+mkdir ~/devops-repo
+cd ~/devops-repo
+Create the required subdirectories:
+# docs -> holds documentation files
+# modules -> holds reusable infrastructure definitions
+# environments -> holds environment-specific configs (dev/test/prod)
+# scripts -> holds automation/helper scripts
+mkdir docs modules environments scripts
+Confirm the structure:
+ls -R
+Expected output: Four empty folders — docs, modules, environments, scripts.
+
+Task 2: Write the README.md
+Create the file:
+touch README.md
+nano README.md
+Add the following content (edit as needed):
+# DevOps Infrastructure Repository
+
+This repository documents the infrastructure design for a sample three-tier application.
+
+## Folder Structure
+
+- **docs/**: Contains architecture documentation, deployment plans, and diagrams.
+- **modules/**: Contains reusable infrastructure component definitions (compute, network, storage).
+- **environments/**: Contains environment-specific manifests (dev, test, prod).
+- **scripts/**: Contains helper scripts for automation tasks.
+
+## Purpose
+This repo serves as a documentation-first approach to Infrastructure as Code (IaC),
+describing intended infrastructure state before implementation.
+Save and exit (Ctrl+O, Enter, Ctrl+X in nano).
+Task 3: Create the YAML Infrastructure Manifest
+Create the manifest file inside environments:
+touch environments/dev.yaml
+nano environments/dev.yaml
+Add the following YAML describing a three-tier app (web, app, database):
+# dev.yaml - Desired state for the Dev environment
+application:
+  name: sample-three-tier-app
+  environment: dev
+
+tiers:
+  web:
+    type: compute
+    instance_count: 2
+    cpu: "1 vCPU"
+    memory: "2GB"
+    port: 80
+
+  app:
+    type: compute
+    instance_count: 2
+    cpu: "2 vCPU"
+    memory: "4GB"
+    port: 8080
+
+  database:
+    type: storage
+    engine: postgresql
+    version: "14"
+    storage_size: "20GB"
+    port: 5432
+
+networking:
+  vpc_name: dev-vpc
+  subnets:
+    - name: web-subnet
+      cidr: 10.0.1.0/24
+    - name: app-subnet
+      cidr: 10.0.2.0/24
+    - name: db-subnet
+      cidr: 10.0.3.0/24
+Save and validate the YAML syntax:
+# Install a simple YAML validator
+pip3 install pyyaml --user
+
+# Validate the file
+python3 -c "import yaml; yaml.safe_load(open('environments/dev.yaml'))" && echo "YAML is valid"
+Task 4: Document Infrastructure Components
+Create a components document:
+touch docs/infrastructure-components.md
+nano docs/infrastructure-components.md
+Add structured documentation:
+# Infrastructure Components
+
+## Compute
+| Tier | Instances | CPU | Memory |
+|------|-----------|-----|--------|
+| Web  | 2         | 1 vCPU | 2GB |
+| App  | 2         | 2 vCPU | 4GB |
+
+## Networking
+| Subnet Name | CIDR Block   | Purpose        |
+|-------------|--------------|----------------|
+| web-subnet  | 10.0.1.0/24  | Web tier traffic |
+| app-subnet  | 10.0.2.0/24  | App tier traffic |
+| db-subnet   | 10.0.3.0/24  | Database traffic |
+
+## Storage
+| Component | Engine     | Size  |
+|-----------|------------|-------|
+| Database  | PostgreSQL | 20GB  |
+Task 5: Create the Deployment Plan
+Create the deployment plan file:
+touch docs/deployment-plan.md
+nano docs/deployment-plan.md
+Add the following template and fill in details:
+# Deployment Plan - Sample Three-Tier App
+
+## Pre-Deployment Checks
+- [ ] Verify YAML manifest syntax is valid
+- [ ] Confirm target environment (dev) exists
+- [ ] Check available compute and storage capacity
+- [ ] Notify team of scheduled deployment window
+
+## Execution Steps
+1. Review infrastructure manifest (environments/dev.yaml)
+2. Provision networking (VPC and subnets)
+3. Provision database (storage tier)
+4. Provision app tier compute instances
+5. Provision web tier compute instances
+6. Run smoke tests to confirm connectivity between tiers
+
+## Rollback Procedures
+1. Identify the failed component (web, app, or database)
+2. Stop new deployments immediately
+3. Restore previous known-good manifest version
+4. Re-run provisioning using the previous manifest
+5. Confirm application health after rollback
+Task 6: Generate an Architecture Diagram (Diagrams-as-Code)
+Create a Python script inside scripts:
+nano scripts/generate_diagram.py
+Add and complete the following starter code:
+# generate_diagram.py
+# This script generates a simple architecture diagram
+# for our sample three-tier application using the "diagrams" library.
+
+from diagrams import Diagram, Cluster
+from diagrams.onprem.compute import Server
+from diagrams.onprem.database import PostgreSQL
+from diagrams.onprem.network import Nginx
+
+# TODO 1: Set the diagram filename and title
+# Hint: Diagram("Three-Tier App Architecture", filename="docs/architecture", show=False)
+with Diagram("Three-Tier App Architecture", filename="docs/architecture", show=False):
+
+    # TODO 2: Create a cluster for the Web tier with 1 Nginx node
+    with Cluster("Web Tier"):
+        web = Nginx("web-server")
+
+    # TODO 3: Create a cluster for the App tier with 1 Server node
+    with Cluster("App Tier"):
+        app = Server("app-server")
+
+    # TODO 4: Create a cluster for the Database tier with 1 PostgreSQL node
+    with Cluster("Database Tier"):
+        db = PostgreSQL("database")
+
+    # TODO 5: Connect the tiers: web -> app -> db
+    web >> app >> db
+Run the script:
+cd ~/devops-repo
+python3 scripts/generate_diagram.py
+Confirm the diagram was created:
+ls docs/
+# You should see architecture.png
+Verification
+Run these checks to confirm your lab is complete:
+
+# 1. Check folder structure exists
+ls ~/devops-repo
+
+# 2. Confirm README.md has content
+cat ~/devops-repo/README.md | head -5
+
+# 3. Validate YAML manifest
+python3 -c "import yaml; yaml.safe_load(open('environments/dev.yaml')); print('Valid YAML')"
+
+# 4. Confirm documentation files exist
+ls ~/devops-repo/docs
+
+# 5. Confirm diagram image was generated
+file ~/devops-repo/docs/architecture.png
+Expected results:
+
+Folder structure shows docs, modules, environments, scripts
+README.md displays repository purpose text
+YAML validation prints "Valid YAML"
+docs/ contains infrastructure-components.md, deployment-plan.md, architecture.png
+Troubleshooting
+YAML validation fails: Check indentation — YAML requires consistent spacing (no tabs).
+dot: command not found: Re-run sudo apt install -y graphviz.
+Diagram script errors on import: Ensure pip3 install diagrams --user completed successfully; try pip3 install --upgrade diagrams.
+Permission denied creating folders: Ensure you are working inside your home directory (~/devops-repo), not a restricted system path.
+Conclusion
+In this lab, you built a foundational IaC documentation repository on a single Linux machine. You created a standard DevOps folder structure, wrote a README explaining its purpose, and authored a YAML manifest describing a three-tier application's desired state. You also documented infrastructure components (compute, networking, storage) in structured tables, created a deployment plan with rollback steps, and used a diagrams-as-code Python tool to generate a visual architecture diagram. These skills form the basis of documentation-first infrastructure practices used by DevOps Engineers and Infrastructure Architects in real-world IaC workflows.
+
