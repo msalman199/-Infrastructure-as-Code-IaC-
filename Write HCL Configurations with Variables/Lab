@@ -1,0 +1,152 @@
+ Write HCL Configurations with Variables
+Learning Objectives
+By the end of this lab, you will be able to:
+
+Write basic HCL (HashiCorp Configuration Language) syntax in Terraform files
+Define input variables with string, number, and list data types
+Use a terraform.tfvars file to supply and override variable values
+Reference variables inside resource blocks to generate dynamic content
+Define and display output values after running terraform apply
+Observe how Terraform detects and applies changes when variables are modified
+Prerequisites
+Basic familiarity with the Linux terminal (navigating folders, editing files)
+No prior Terraform experience required
+A text editor available on the machine (e.g., nano or vim)
+Environment Setup
+This lab uses a single Linux machine provided via Start Lab. No cloud account or credit card is required — we use Terraform's local provider only.
+
+Open a terminal on your lab machine.
+Install Terraform (skip if already installed):
+sudo apt-get update
+sudo apt-get install -y wget unzip
+wget https://releases.hashicorp.com/terraform/1.9.0/terraform_1.9.0_linux_amd64.zip
+unzip terraform_1.9.0_linux_amd64.zip
+sudo mv terraform /usr/local/bin/
+terraform -version
+Confirm output shows a Terraform version (e.g., Terraform v1.9.0).
+Tasks
+Task 1: Create the Project Directory
+mkdir ~/hcl-variables-lab
+cd ~/hcl-variables-lab
+touch main.tf variables.tf terraform.tfvars outputs.tf
+main.tf — main configuration (resources)
+variables.tf — variable declarations
+terraform.tfvars — variable values
+outputs.tf — output definitions
+Task 2: Define Input Variables
+Open variables.tf and add the following. Each variable shows a different data type.
+
+# variables.tf
+
+# A string variable with a default value
+variable "student_name" {
+  description = "Name of the student"
+  type        = string
+  default     = "guest"
+}
+
+# A number variable with a default value
+variable "file_count" {
+  description = "Number of lines to write in the file"
+  type        = number
+  default     = 1
+}
+
+# A list variable with default values
+variable "course_topics" {
+  description = "List of topics covered in this course"
+  type        = list(string)
+  default     = ["HCL", "Terraform", "Variables"]
+}
+Task 3: Create terraform.tfvars to Override Defaults
+Edit terraform.tfvars:
+
+# terraform.tfvars
+# These values override the defaults set in variables.tf
+
+student_name  = "Ahmed"
+file_count    = 3
+course_topics = ["HCL", "Terraform", "IaC", "DevOps"]
+Task 4: Write main.tf Using the Local Provider
+Add this to main.tf. It creates a local text file whose content is built from your variables.
+
+# main.tf
+
+terraform {
+  required_providers {
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
+  }
+}
+
+# The local_file resource writes content to a file on disk
+resource "local_file" "student_info" {
+  filename = "${path.module}/student_output.txt"
+
+  # TODO: Use string interpolation to combine variables into one string
+  # Hint: use join() to convert the list into a comma-separated string
+  content = <<-EOT
+    Student Name: ${var.student_name}
+    Number of Files Requested: ${var.file_count}
+    Topics Covered: ${join(", ", var.course_topics)}
+  EOT
+}
+Task 5: Define Outputs
+Edit outputs.tf:
+
+# outputs.tf
+
+# Displays the path of the created file after apply
+output "file_path" {
+  description = "Path to the generated file"
+  value       = local_file.student_info.filename
+}
+
+# Displays the student name used
+output "student_name_output" {
+  description = "Name of the student used in the configuration"
+  value       = var.student_name
+}
+
+# TODO: Add one more output that displays the course_topics list
+Task 6: Initialize, Plan, and Apply
+Run the following commands in order:
+
+terraform init
+terraform plan
+terraform apply
+Type yes when prompted to confirm apply.
+Check the result:
+cat student_output.txt
+You should see your name, file count, and topics list printed inside the file.
+Task 7: Modify a Variable and Re-Apply
+Open terraform.tfvars and change one value, for example:
+student_name = "Fatima"
+file_count   = 5
+Run plan again to see what will change:
+terraform plan
+Notice Terraform shows the file will be updated in-place (since content changes).
+Apply the change:
+terraform apply
+Verify the file content updated:
+cat student_output.txt
+Verification
+Confirm your lab is complete by checking:
+
+ variables.tf contains three variables of type string, number, and list
+ terraform.tfvars overrides all three default values
+ terraform apply runs successfully with no errors
+ student_output.txt exists and contains variable-driven content
+ terraform output command displays your defined outputs:
+terraform output
+ After changing a variable and re-applying, student_output.txt reflects the new values
+Troubleshooting Tips
+Error: provider not found — Run terraform init again to download the local provider.
+Variable value not applying — Ensure terraform.tfvars is in the same directory as main.tf (Terraform loads it automatically).
+Syntax errors in HCL — Check for missing quotes, brackets, or curly braces; run terraform validate to catch mistakes.
+File not created — Confirm you ran terraform apply and typed yes to confirm.
+Permission denied — Ensure you have write access to the project directory (ls -l to check permissions).
+Conclusion
+In this lab, you learned the fundamentals of writing HCL configurations using Terraform's local provider. You created and organized a Terraform project into main.tf, variables.tf, terraform.tfvars, and outputs.tf files. You defined input variables using string, number, and list data types, supplied custom values through a .tfvars file, and referenced those variables inside a resource block to dynamically generate file content. You also defined output values to display key information after applying your configuration, and observed how Terraform detects and applies changes when variable values are modified. These skills form the foundation for writing reusable, parameterized Infrastructure as Code configurations — a core competency for the HashiCorp Certified: Terraform Associate exam and real-world DevOps/Infrastructure Engineer roles.
