@@ -1,0 +1,124 @@
+Manage Secrets in IaC with HashiCorp Vault
+Objectives
+Deploy HashiCorp Vault in dev mode to manage infrastructure secrets
+Integrate Terraform with Vault provider for dynamic secret retrieval
+Generate configuration files with injected secrets without plaintext exposure in code
+Perform secret rotation and validate propagation through IaC pipeline
+Prerequisites
+Strong understanding of Terraform (providers, resources, state, variables)
+Familiarity with Vault concepts: secrets engines, tokens, policies, KV versioning
+Linux CLI proficiency (systemd, curl, package management)
+Basic understanding of secrets lifecycle management in DevOps pipelines
+Environment Setup
+Single Linux machine (Ubuntu/Debian or RHEL-based) provisioned via Start Lab
+Root/sudo access required
+Outbound internet access for package downloads
+Install required tooling independently using official HashiCorp APT/YUM repositories or binary releases. Verify versions:
+
+vault version
+terraform version
+Both should be recent stable releases (Vault 1.15+, Terraform 1.6+).
+
+Task 1: Deploy Vault in Dev Mode and Configure Secrets Engine
+Requirements:
+
+Start Vault in dev mode, bound to 127.0.0.1:8200
+Capture the generated root token and unseal key from dev server output
+Export required environment variables (VAULT_ADDR, VAULT_TOKEN) for CLI operations
+Enable a KV Version 2 secrets engine at a custom path (e.g., secret/)
+Design your secret path hierarchy to reflect a real infra layout, e.g.:
+secret/database/prod
+secret/api/external-service
+Deliverable: Store the following secrets under appropriate paths:
+
+db_password, db_username
+api_key, api_endpoint
+Use vault kv put and confirm with vault kv get. Document your path design decisions (why KV v2, why this hierarchy) in a short NOTES.md.
+
+Considerations:
+
+Dev mode stores everything in-memory — data is lost on restart. Note implications for production use vs. this lab context.
+Research: what changes would be required to run Vault in production mode with persistent storage (file/Consul/Raft backend) instead?
+Task 2: Terraform Integration with Vault Provider
+Architecture:
+
+Terraform Config
+  ├── provider "vault" (auth via token)
+  ├── data "vault_kv_secret_v2" (fetch db + api secrets)
+  ├── locals (map/transform secret attributes)
+  └── resource "local_file" (render templated config using secrets)
+Requirements:
+
+Configure the vault provider block — decide how to supply address/token securely (avoid hardcoding token in .tf files; consider environment variables or a .tfvars file excluded from version control).
+
+Use the vault_kv_secret_v2 (or equivalent current data source) to fetch secrets from both paths created in Task 1.
+
+Create a templatefile()-driven local_file resource that renders an application config (e.g., app_config.conf or .yaml) embedding the fetched values.
+
+Starter skeleton — complete the implementation:
+
+# providers.tf
+terraform {
+  required_providers {
+    vault = {
+      source  = "hashicorp/vault"
+      version = "~> 4.0"
+    }
+  }
+}
+
+provider "vault" {
+  # TODO: address and token configuration
+  # Decide: variable, env var (VAULT_TOKEN), or file-based?
+}
+# data.tf
+data "vault_kv_secret_v2" "db" {
+  # TODO: mount, name
+}
+
+data "vault_kv_secret_v2" "api" {
+  # TODO: mount, name
+}
+# main.tf
+locals {
+  # TODO: build a map of rendered values from data sources
+}
+
+resource "local_file" "app_config" {
+  filename = "${path.module}/output/app_config.conf"
+  content  = templatefile("${path.module}/templates/app_config.tpl", {
+    # TODO: pass required secret values
+  })
+}
+# templates/app_config.tpl
+# TODO: design a template referencing ${db_username}, ${db_password}, ${api_key}, ${api_endpoint}
+Design decisions to make:
+
+Should local_file output directory be gitignored? Why?
+How do you prevent secret values from appearing in terraform plan output logs or CI/CD console logs?
+Investigate sensitive = true on outputs/variables — apply where relevant.
+Task 3: Apply, Verify, and Rotate
+Run terraform init, terraform plan, terraform apply.
+Inspect plan output — confirm secret values are marked (sensitive value) rather than shown in plaintext.
+Verify generated file contents match Vault-stored secrets (inspect output/app_config.conf directly on disk, not via Terraform output).
+Rotation exercise:
+Update db_password in Vault using vault kv put (KV v2 auto-versions).
+Re-run terraform plan — determine whether Terraform detects the change automatically, or whether a -refresh or taint/replace is needed.
+Document your finding: does the vault_kv_secret_v2 data source refresh on every plan by default? Why or why not (research data source refresh behavior)?
+Re-apply and confirm the new secret value propagates into the config file.
+Edge cases to address:
+
+What happens if the secret path or key name doesn't exist? How does Terraform behave (error handling)?
+What if Vault dev server restarts mid-workflow (token invalidated)? How would you detect and recover in a real pipeline?
+Verification
+Confirm the following on your machine:
+
+vault kv get secret/database/prod
+vault kv get -version=1 secret/database/prod   # confirm version history exists
+cat output/app_config.conf                      # matches latest secret values
+terraform state list                             # data sources + local_file present
+terraform plan after rotation shows a diff/update for local_file.app_config
+No secret values appear in terraform show in plaintext unless explicitly marked non-sensitive
+app_config.conf reflects the rotated db_password
+Conclusion
+In this lab, you deployed HashiCorp Vault in dev mode, designed a KV v2 secret path hierarchy, and integrated it with Terraform using the Vault provider's data sources. You built a pipeline that dynamically fetches secrets and renders them into a templated configuration file via local_file, while evaluating how Terraform handles sensitive values in plan/apply output. Finally, you performed a live secret rotation in Vault and analyzed Terraform's data source refresh behavior to confirm propagation. These skills directly map to real-world secrets management patterns required for the HashiCorp Vault Associate certification and production DevOps/Security Engineer responsibilities, including secure secret injection, avoiding hardcoded credentials, and managing secret lifecycle in IaC workflows.
